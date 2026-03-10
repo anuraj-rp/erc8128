@@ -87,10 +87,9 @@ T = TypeVar("T")
 def merge_dataclass(base: T | None, override: T | None, cls: type[T]) -> T:
     source = base or cls()
     if override is None:
-      return source
+        return source
     values = {}
     for field in fields(cls):
         candidate = getattr(override, field.name)
         values[field.name] = candidate if candidate is not None else getattr(source, field.name)
     return cls(**values)
-
