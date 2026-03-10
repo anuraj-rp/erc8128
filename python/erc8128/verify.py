@@ -61,7 +61,9 @@ def verify_request(
     )
     if not attempts:
         return VerifyFailure(reason="class_bound_not_allowed" if saw_class_bound and class_bound_policies else "not_request_bound")
-    max_signature_verifications = resolved_policy.max_signature_verifications or 3
+    max_signature_verifications = (
+        3 if resolved_policy.max_signature_verifications is None else resolved_policy.max_signature_verifications
+    )
     last_failure = VerifyFailure(reason="bad_signature")
     for attempt in attempts[:max_signature_verifications]:
         candidate: SelectedSignature = attempt.candidate

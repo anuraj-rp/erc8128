@@ -81,6 +81,32 @@ class SignVerifyTests(unittest.TestCase):
         self.assertFalse(second.ok)
         self.assertEqual(second.reason, "replay")
 
+    def test_verify_respects_explicit_zero_max_signature_verifications(self):
+        signer = HmacSigner()
+        created = 1_700_000_000
+        signed = sign_request(
+            "https://example.com/limit",
+            signer,
+            init={"method": "GET"},
+            options=SignOptions(created=created, expires=created + 60, nonce="nonce-3"),
+        )
+        calls = 0
+
+        def counting_verify_message(args):
+            nonlocal calls
+            calls += 1
+            return verify_message(args)
+
+        result = verify_request(
+            signed,
+            verify_message=counting_verify_message,
+            nonce_store=NonceStore(),
+            policy=VerifyPolicy(now=lambda: created, max_signature_verifications=0),
+        )
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "bad_signature")
+        self.assertEqual(calls, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
