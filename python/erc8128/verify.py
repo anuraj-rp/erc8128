@@ -18,7 +18,7 @@ from ._shared import (
     signature_bytes_to_hex,
     verify_content_digest,
 )
-from .types import VerifyFailure, VerifyPolicy, VerifySuccess, merge_dataclass
+from .types import VerifyFailure, VerifyPolicy, VerifySuccess, merge_model
 
 
 def verify_request(
@@ -28,7 +28,7 @@ def verify_request(
     policy: VerifyPolicy | None = None,
     set_headers: Callable[[str, str], None] | None = None,
 ):
-    resolved_policy = merge_dataclass(VerifyPolicy(), policy, VerifyPolicy)
+    resolved_policy = merge_model(VerifyPolicy(), policy, VerifyPolicy)
     label = resolved_policy.label
     strict_label = resolved_policy.strict_label or False
     now = resolved_policy.now() if resolved_policy.now else unix_now()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
 from typing import Any, Callable, Literal, TypeVar
+from pydantic import BaseModel, ConfigDict
 
 Hex = str
 Address = str
@@ -16,8 +16,11 @@ class Erc8128Error(Exception):
         self.code = code
 
 
-@dataclass(frozen=True)
-class SignatureParams:
+class Erc8128Model(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+
+
+class SignatureParams(Erc8128Model):
     created: int
     expires: int
     keyid: str
@@ -25,8 +28,7 @@ class SignatureParams:
     tag: str | None = None
 
 
-@dataclass(frozen=True)
-class SignOptions:
+class SignOptions(Erc8128Model):
     label: str | None = None
     binding: BindingMode | None = None
     replay: ReplayMode | None = None
@@ -38,13 +40,11 @@ class SignOptions:
     components: list[str] | None = None
 
 
-@dataclass(frozen=True)
 class ClientOptions(SignOptions):
     fetch: Callable[[Any], Any] | None = None
 
 
-@dataclass(frozen=True)
-class VerifyPolicy:
+class VerifyPolicy(Erc8128Model):
     label: str | None = None
     strict_label: bool | None = None
     additional_request_bound_components: list[str] | None = None
@@ -60,8 +60,7 @@ class VerifyPolicy:
     nonce_key: Callable[[str, str], str] | None = None
 
 
-@dataclass(frozen=True)
-class VerifySuccess:
+class VerifySuccess(Erc8128Model):
     address: Address
     chain_id: int
     label: str
@@ -72,8 +71,7 @@ class VerifySuccess:
     ok: Literal[True] = True
 
 
-@dataclass(frozen=True)
-class VerifyFailure:
+class VerifyFailure(Erc8128Model):
     reason: str
     detail: str | None = None
     ok: Literal[False] = False
@@ -84,12 +82,13 @@ VerifyResult = VerifySuccess | VerifyFailure
 T = TypeVar("T")
 
 
-def merge_dataclass(base: T | None, override: T | None, cls: type[T]) -> T:
+def merge_model(base: T | None, override: T | None, cls: type[T]) -> T:
     source = base or cls()
     if override is None:
         return source
-    values = {}
-    for field in fields(cls):
-        candidate = getattr(override, field.name)
-        values[field.name] = candidate if candidate is not None else getattr(source, field.name)
-    return cls(**values)
+    values = {
+        field_name: getattr(override, field_name)
+        for field_name in cls.model_fields
+        if getattr(override, field_name) is not None
+    }
+    return source.model_copy(update=values)

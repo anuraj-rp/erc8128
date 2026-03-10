@@ -19,6 +19,14 @@ npm install @slicekit/erc8128
 
 A Python port lives in [`python/`](./python) and exposes the same core building blocks: `sign_request`, `verify_request`, `create_signer_client`, and `create_verifier_client`.
 
+Install and run it with `uv`:
+
+```bash
+cd python
+uv sync
+uv run python -m unittest discover -s tests -v
+```
+
 ```python
 from erc8128 import HttpRequest, SignOptions, create_signer_client
 

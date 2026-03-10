@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any, Mapping
 
 from ._request import HttpRequest
 from .sign import sign_request, signed_fetch
-from .types import ClientOptions, SignOptions, VerifyPolicy, merge_dataclass
+from .types import ClientOptions, SignOptions, VerifyPolicy, merge_model
 from .verify import verify_request
 
 
@@ -15,7 +14,7 @@ class SignerClient:
         self.defaults = defaults or ClientOptions()
 
     def sign_request(self, input_value: str | HttpRequest, init: Mapping[str, Any] | None = None, options: SignOptions | None = None) -> HttpRequest:
-        merged = merge_dataclass(
+        merged = merge_model(
             SignOptions(
                 label=self.defaults.label,
                 binding=self.defaults.binding,
@@ -33,7 +32,7 @@ class SignerClient:
         return sign_request(input_value, self.signer, init=init, options=merged)
 
     def signed_fetch(self, input_value: str | HttpRequest, init: Mapping[str, Any] | None = None, options: ClientOptions | None = None):
-        merged = merge_dataclass(self.defaults, options, ClientOptions)
+        merged = merge_model(self.defaults, options, ClientOptions)
         return signed_fetch(input_value, self.signer, init=init, options=merged)
 
     def fetch(self, input_value: str | HttpRequest, init: Mapping[str, Any] | None = None, options: ClientOptions | None = None):
@@ -47,7 +46,7 @@ class VerifierClient:
         self.defaults = defaults or VerifyPolicy()
 
     def verify_request(self, request: HttpRequest, policy: VerifyPolicy | None = None, set_headers=None):
-        merged = merge_dataclass(self.defaults, policy, VerifyPolicy)
+        merged = merge_model(self.defaults, policy, VerifyPolicy)
         return verify_request(
             request=request,
             verify_message=self.verify_message,

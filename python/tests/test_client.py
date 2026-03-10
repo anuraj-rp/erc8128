@@ -29,6 +29,11 @@ def verify_message(args):
 
 
 class ClientTests(unittest.TestCase):
+    def test_http_response_and_options_are_pydantic_models(self):
+        response = HttpResponse(status=200, headers={"X-Test": "1"}, body=b"ok", url="https://example.com")
+        self.assertEqual(response.headers["x-test"], "1")
+        self.assertEqual(ClientOptions(nonce="nonce-1").model_dump()["nonce"], "nonce-1")
+
     def test_sign_request_merges_defaults_with_call_options(self):
         client = create_signer_client(
             HmacSigner(),

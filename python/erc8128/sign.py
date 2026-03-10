@@ -15,7 +15,7 @@ from ._shared import (
     serialize_signature_params_inner_list,
     set_content_digest_header,
 )
-from .types import ClientOptions, Erc8128Error, SignOptions, SignatureParams, merge_dataclass
+from .types import ClientOptions, Erc8128Error, SignOptions, SignatureParams, merge_model
 
 
 def sign_request(
@@ -24,7 +24,7 @@ def sign_request(
     init: Mapping[str, Any] | None = None,
     options: SignOptions | None = None,
 ) -> HttpRequest:
-    resolved_options = merge_dataclass(SignOptions(), options, SignOptions)
+    resolved_options = merge_model(SignOptions(), options, SignOptions)
     request = to_request(input_value, init)
     label = resolved_options.label or "eth"
     binding = resolved_options.binding or "request-bound"
@@ -74,7 +74,7 @@ def signed_fetch(
     init: Mapping[str, Any] | None = None,
     options: ClientOptions | None = None,
 ):
-    resolved_options = merge_dataclass(ClientOptions(), options, ClientOptions)
+    resolved_options = merge_model(ClientOptions(), options, ClientOptions)
     request = sign_request(input_value, signer, init=init, options=SignOptions(
         label=resolved_options.label,
         binding=resolved_options.binding,

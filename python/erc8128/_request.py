@@ -3,11 +3,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
-from dataclasses import dataclass, field
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .types import Erc8128Error, Hex
 
@@ -35,33 +36,53 @@ class Headers(dict[str, str]):
         return Headers(self)
 
 
-@dataclass
-class HttpRequest:
+class HttpRequest(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     url: str
     method: str = "GET"
-    headers: Headers = field(default_factory=Headers)
+    headers: Headers = Field(default_factory=Headers)
     body: bytes | str | bytearray | None = None
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.headers, Headers):
-            self.headers = Headers(self.headers)
-        self.method = (self.method or "GET").upper()
+    def __init__(self, url: str, **data: Any):
+        super().__init__(url=url, **data)
+
+    @field_validator("method", mode="before")
+    @classmethod
+    def normalize_method(cls, value: str | None) -> str:
+        return (value or "GET").upper()
+
+    @field_validator("headers", mode="before")
+    @classmethod
+    def normalize_headers(cls, value: Headers | Mapping[str, str] | None) -> Headers:
+        if isinstance(value, Headers):
+            return value
+        return Headers(value)
 
     def clone(self, *, headers: Mapping[str, str] | None = None) -> "HttpRequest":
-        return HttpRequest(
-            url=self.url,
-            method=self.method,
-            headers=Headers(headers or self.headers),
-            body=self.body,
+        return self.model_copy(
+            update={"headers": Headers(headers or self.headers)},
+            deep=True,
         )
 
 
-@dataclass
-class HttpResponse:
+class HttpResponse(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     status: int
     headers: Headers
     body: bytes
     url: str
+
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+
+    @field_validator("headers", mode="before")
+    @classmethod
+    def normalize_headers(cls, value: Headers | Mapping[str, str]) -> Headers:
+        if isinstance(value, Headers):
+            return value
+        return Headers(value)
 
     @property
     def text(self) -> str:
