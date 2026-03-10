@@ -11,6 +11,7 @@ from ._shared import (
     normalize_class_bound_policies,
     normalize_components_list,
     parse_key_id,
+    quote_sf_string,
     required_request_bound_components,
     run_nonce_checks,
     run_time_checks,
@@ -40,7 +41,10 @@ def verify_request(
     request_bound_required = required_request_bound_components(has_query, has_body, request_bound_extras)
     class_bound_policies = [ensure_authority(policy_item) for policy_item in normalize_class_bound_policies(resolved_policy.class_bound_policies)]
     if set_headers:
-        set_headers("Accept-Signature", build_accept_signature_header(request_bound_required, class_bound_policies, not allow_replayable))
+        try:
+            set_headers("Accept-Signature", build_accept_signature_header(request_bound_required, class_bound_policies, not allow_replayable))
+        except Exception:
+            pass
     signature_input_header = request.headers.get("signature-input")
     signature_header = request.headers.get("signature")
     if not signature_input_header or not signature_header:
@@ -61,9 +65,13 @@ def verify_request(
     )
     if not attempts:
         return VerifyFailure(reason="class_bound_not_allowed" if saw_class_bound and class_bound_policies else "not_request_bound")
-    max_signature_verifications = (
-        3 if resolved_policy.max_signature_verifications is None else resolved_policy.max_signature_verifications
-    )
+    max_signature_verifications = 3
+    if (
+        isinstance(resolved_policy.max_signature_verifications, int)
+        and not isinstance(resolved_policy.max_signature_verifications, bool)
+        and resolved_policy.max_signature_verifications > 0
+    ):
+        max_signature_verifications = resolved_policy.max_signature_verifications
     last_failure = VerifyFailure(reason="bad_signature")
     for attempt in attempts[:max_signature_verifications]:
         candidate: SelectedSignature = attempt.candidate
@@ -152,7 +160,22 @@ def verify_request(
 
 
 def build_accept_signature_header(request_bound_required: list[str], class_bound_policies: list[list[str]], require_nonce: bool) -> str:
-    policies = ['(' + ' '.join(f'"{component}"' for component in request_bound_required) + ')']
-    policies.extend('(' + ' '.join(f'"{component}"' for component in policy) + ')' for policy in class_bound_policies)
-    value = ", ".join(policies)
-    return f"{value};nonce={'?1' if require_nonce else '?0'}"
+    entries: list[str] = []
+    seen: set[tuple[str, ...]] = set()
+
+    def add_entry(components: list[str]) -> None:
+        key = tuple(components)
+        if key in seen:
+            return
+        seen.add(key)
+        items = " ".join(quote_sf_string(component) for component in components)
+        value = f"({items});keyid;created;expires"
+        if require_nonce:
+            value += ";nonce"
+        entries.append(f"sig{len(entries) + 1}={value}")
+
+    add_entry(request_bound_required)
+    for policy in class_bound_policies:
+        add_entry(policy)
+
+    return ", ".join(entries)

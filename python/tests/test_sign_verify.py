@@ -4,6 +4,8 @@ import hmac
 import unittest
 
 from erc8128 import HttpRequest, SignOptions, VerifyPolicy, sign_request, verify_request
+from erc8128._shared import format_key_id
+from erc8128.verify import build_accept_signature_header
 
 
 SECRET = b"erc8128-test-secret"
@@ -81,7 +83,7 @@ class SignVerifyTests(unittest.TestCase):
         self.assertFalse(second.ok)
         self.assertEqual(second.reason, "replay")
 
-    def test_verify_respects_explicit_zero_max_signature_verifications(self):
+    def test_verify_defaults_max_signature_verifications_for_non_positive_values(self):
         signer = HmacSigner()
         created = 1_700_000_000
         signed = sign_request(
@@ -97,15 +99,79 @@ class SignVerifyTests(unittest.TestCase):
             calls += 1
             return verify_message(args)
 
+        for limit in (0, -1):
+            with self.subTest(limit=limit):
+                calls = 0
+                result = verify_request(
+                    signed,
+                    verify_message=counting_verify_message,
+                    nonce_store=NonceStore(),
+                    policy=VerifyPolicy(now=lambda: created, max_signature_verifications=limit),
+                )
+                self.assertTrue(result.ok)
+                self.assertEqual(calls, 1)
+
+    def test_verify_sets_accept_signature_header_in_ts_format(self):
+        header = build_accept_signature_header(
+            ["@authority", "@method", "@path"],
+            [["@authority"], ["@authority", "@method", "@path"]],
+            True,
+        )
+        self.assertEqual(
+            header,
+            'sig1=("@authority" "@method" "@path");keyid;created;expires;nonce, '
+            'sig2=("@authority");keyid;created;expires;nonce',
+        )
+
+    def test_verify_ignores_accept_signature_header_failures(self):
+        signer = HmacSigner()
+        created = 1_700_000_000
+        signed = sign_request(
+            "https://example.com/header-failure",
+            signer,
+            init={"method": "GET"},
+            options=SignOptions(created=created, expires=created + 60, nonce="nonce-4"),
+        )
+
+        def raising_set_headers(name, value):
+            raise RuntimeError("header sink failed")
+
         result = verify_request(
             signed,
-            verify_message=counting_verify_message,
+            verify_message=verify_message,
             nonce_store=NonceStore(),
-            policy=VerifyPolicy(now=lambda: created, max_signature_verifications=0),
+            policy=VerifyPolicy(now=lambda: created),
+            set_headers=raising_set_headers,
         )
-        self.assertFalse(result.ok)
-        self.assertEqual(result.reason, "bad_signature")
-        self.assertEqual(calls, 0)
+        self.assertTrue(result.ok)
+
+    def test_verify_ignores_accept_signature_serialization_failures(self):
+        signer = HmacSigner()
+        created = 1_700_000_000
+        signed = sign_request(
+            "https://example.com/header-serialization-failure",
+            signer,
+            init={"method": "GET"},
+            options=SignOptions(created=created, expires=created + 60, nonce="nonce-5"),
+        )
+
+        result = verify_request(
+            signed,
+            verify_message=verify_message,
+            nonce_store=NonceStore(),
+            policy=VerifyPolicy(
+                now=lambda: created,
+                class_bound_policies=[["@authority", "bad\ncomponent"]],
+            ),
+            set_headers=lambda name, value: None,
+        )
+        self.assertTrue(result.ok)
+
+    def test_format_key_id_rejects_bool_and_float(self):
+        for chain_id in (True, 1.0):
+            with self.subTest(chain_id=chain_id):
+                with self.assertRaisesRegex(Exception, "chainId must be positive integer"):
+                    format_key_id(chain_id, ADDRESS)
 
 
 if __name__ == "__main__":

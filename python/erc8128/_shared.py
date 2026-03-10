@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import re
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -24,7 +25,7 @@ KEYID_RE = re.compile(r"^erc8128:(\d+):(0x[a-fA-F0-9]{40})$")
 
 
 def format_key_id(chain_id: int, address: str) -> str:
-    if int(chain_id) != chain_id or chain_id < 0:
+    if not isinstance(chain_id, int) or isinstance(chain_id, bool) or chain_id < 0:
         raise Erc8128Error("INVALID_OPTIONS", "chainId must be positive integer.")
     return f"erc8128:{chain_id}:{address.lower()}"
 
@@ -150,7 +151,7 @@ def verify_content_digest(request: HttpRequest) -> bool:
     parsed = parse_content_digest(value)
     if not parsed or parsed["alg"] != "sha-256":
         return False
-    return parsed["b64"] == base64_encode(sha256(read_body_bytes(request)))
+    return hmac.compare_digest(parsed["b64"], base64_encode(sha256(read_body_bytes(request))))
 
 
 def create_signature_base_minimal(request: HttpRequest, components: list[str], signature_params_value: str) -> bytes:
