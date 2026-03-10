@@ -3,7 +3,8 @@ import hashlib
 import hmac
 import unittest
 
-from erc8128 import HttpRequest, SignOptions, VerifyPolicy, sign_request, verify_request
+from erc8128 import Erc8128Error, HttpRequest, SignOptions, VerifyPolicy, sign_request, verify_request
+from erc8128._request import hex_to_bytes
 from erc8128._shared import format_key_id
 from erc8128.verify import build_accept_signature_header
 
@@ -167,11 +168,25 @@ class SignVerifyTests(unittest.TestCase):
         )
         self.assertTrue(result.ok)
 
-    def test_format_key_id_rejects_bool_and_float(self):
+    def test_format_key_id_rejects_zero_and_negative_values(self):
+        for chain_id in (0, -1):
+            with self.subTest(chain_id=chain_id):
+                with self.assertRaisesRegex(Erc8128Error, "chainId must be positive integer"):
+                    format_key_id(chain_id, ADDRESS)
+
+    def test_format_key_id_rejects_non_integer_values(self):
         for chain_id in (True, 1.0):
             with self.subTest(chain_id=chain_id):
-                with self.assertRaisesRegex(Exception, "chainId must be positive integer"):
+                with self.assertRaisesRegex(Erc8128Error, "chainId must be positive integer"):
                     format_key_id(chain_id, ADDRESS)
+
+    def test_format_key_id_formats_positive_integers(self):
+        self.assertEqual(format_key_id(1, ADDRESS), f"erc8128:1:{ADDRESS.lower()}")
+        self.assertEqual(format_key_id(137, ADDRESS), f"erc8128:137:{ADDRESS.lower()}")
+
+    def test_hex_to_bytes_rejects_invalid_characters(self):
+        with self.assertRaisesRegex(Erc8128Error, "Invalid hex characters"):
+            hex_to_bytes("0xGG")
 
 
 if __name__ == "__main__":

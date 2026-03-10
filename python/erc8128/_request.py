@@ -179,7 +179,10 @@ def base64_url_encode(data: bytes) -> str:
 def hex_to_bytes(value: Hex) -> bytes:
     if not value.startswith("0x") or len(value) % 2 != 0:
         raise Erc8128Error("UNSUPPORTED_REQUEST", "Invalid hex length.")
-    return bytes.fromhex(value[2:])
+    try:
+        return bytes.fromhex(value[2:])
+    except ValueError as exc:
+        raise Erc8128Error("UNSUPPORTED_REQUEST", "Invalid hex characters.") from exc
 
 
 def bytes_to_hex(value: bytes) -> Hex:
@@ -192,7 +195,7 @@ def default_fetch(request: HttpRequest) -> HttpResponse:
         request.url,
         headers=dict(request.headers),
         content=read_body_bytes(request) if request.body is not None else None,
-        follow_redirects=True,
+        follow_redirects=False,
     )
     return HttpResponse(
         status=response.status_code,

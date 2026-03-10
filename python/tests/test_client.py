@@ -90,7 +90,7 @@ class ClientTests(unittest.TestCase):
             "https://example.com/orders",
             headers={"content-type": "text/plain"},
             content=b"hello",
-            follow_redirects=True,
+            follow_redirects=False,
         )
         self.assertEqual(response.status, 201)
         self.assertEqual(response.headers["x-test"], "1")

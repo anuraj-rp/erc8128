@@ -25,7 +25,7 @@ KEYID_RE = re.compile(r"^erc8128:(\d+):(0x[a-fA-F0-9]{40})$")
 
 
 def format_key_id(chain_id: int, address: str) -> str:
-    if not isinstance(chain_id, int) or isinstance(chain_id, bool) or chain_id < 0:
+    if not isinstance(chain_id, int) or isinstance(chain_id, bool) or chain_id <= 0:
         raise Erc8128Error("INVALID_OPTIONS", "chainId must be positive integer.")
     return f"erc8128:{chain_id}:{address.lower()}"
 
