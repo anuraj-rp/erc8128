@@ -3,10 +3,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+from dataclasses import dataclass
 from typing import Any, Mapping
-from urllib.parse import urlsplit
-from urllib.request import Request as UrlRequest
-from urllib.request import urlopen
+
+import httpx
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -89,6 +89,15 @@ class HttpResponse(BaseModel):
         return self.body.decode("utf-8", errors="replace")
 
 
+@dataclass(frozen=True)
+class SanitizedUrl:
+    scheme: str
+    hostname: str | None
+    port: int | None
+    path: str
+    query: str
+
+
 def to_request(input_value: str | HttpRequest, init: Mapping[str, Any] | None = None) -> HttpRequest:
     if isinstance(input_value, HttpRequest):
         if not init:
@@ -109,10 +118,19 @@ def to_request(input_value: str | HttpRequest, init: Mapping[str, Any] | None = 
 
 
 def sanitize_url(url: str):
-    parsed = urlsplit(url)
-    if not parsed.scheme or not parsed.netloc:
+    try:
+        parsed = httpx.URL(url)
+    except Exception as exc:
+        raise Erc8128Error("UNSUPPORTED_REQUEST", f"Request.url must be absolute (got: {url}).") from exc
+    if not parsed.scheme or not parsed.host:
         raise Erc8128Error("UNSUPPORTED_REQUEST", f"Request.url must be absolute (got: {url}).")
-    return parsed
+    return SanitizedUrl(
+        scheme=parsed.scheme,
+        hostname=parsed.host,
+        port=parsed.port,
+        path=parsed.path,
+        query=parsed.query.decode("ascii"),
+    )
 
 
 def unix_now() -> int:
@@ -169,16 +187,16 @@ def bytes_to_hex(value: bytes) -> Hex:
 
 
 def default_fetch(request: HttpRequest) -> HttpResponse:
-    native = UrlRequest(
+    response = httpx.request(
+        request.method,
         request.url,
-        data=read_body_bytes(request) if request.body is not None else None,
         headers=dict(request.headers),
-        method=request.method,
+        content=read_body_bytes(request) if request.body is not None else None,
+        follow_redirects=True,
     )
-    with urlopen(native) as response:
-        return HttpResponse(
-            status=response.status,
-            headers=Headers(dict(response.headers.items())),
-            body=response.read(),
-            url=response.geturl(),
-        )
+    return HttpResponse(
+        status=response.status_code,
+        headers=Headers(dict(response.headers)),
+        body=response.content,
+        url=str(response.url),
+    )

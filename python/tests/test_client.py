@@ -1,8 +1,12 @@
 import hashlib
 import hmac
 import unittest
+from unittest.mock import patch
+
+import httpx
 
 from erc8128 import ClientOptions, HttpResponse, SignOptions, VerifyPolicy, create_signer_client, create_verifier_client
+from erc8128._request import HttpRequest, default_fetch
 
 
 SECRET = b"erc8128-test-secret"
@@ -62,6 +66,36 @@ class ClientTests(unittest.TestCase):
         )
         client.fetch("https://example.com", init={"method": "GET"}, options=ClientOptions(nonce="nonce-call"))
         self.assertIn('nonce="nonce-call"', recorded["request"].headers["signature-input"])
+
+    @patch("erc8128._request.httpx.request")
+    def test_default_fetch_uses_httpx(self, mock_request):
+        mock_request.return_value = httpx.Response(
+            201,
+            headers={"X-Test": "1"},
+            content=b"ok",
+            request=httpx.Request("POST", "https://example.com/orders"),
+        )
+
+        response = default_fetch(
+            HttpRequest(
+                "https://example.com/orders",
+                method="POST",
+                headers={"content-type": "text/plain"},
+                body="hello",
+            )
+        )
+
+        mock_request.assert_called_once_with(
+            "POST",
+            "https://example.com/orders",
+            headers={"content-type": "text/plain"},
+            content=b"hello",
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status, 201)
+        self.assertEqual(response.headers["x-test"], "1")
+        self.assertEqual(response.body, b"ok")
+        self.assertEqual(response.url, "https://example.com/orders")
 
     def test_verifier_client_uses_defaults(self):
         signer_client = create_signer_client(HmacSigner())

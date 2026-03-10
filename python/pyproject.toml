@@ -9,7 +9,7 @@ description = "Python implementation of ERC-8128 signing and verification"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dependencies = ["pydantic>=2.12.5,<3"]
+dependencies = ["pydantic>=2.12.5,<3", "httpx>=0.28.1,<1"]
 
 [tool.uv]
 package = true
