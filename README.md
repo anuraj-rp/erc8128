@@ -18,6 +18,7 @@ npm install @slicekit/erc8128
 ### Python implementation
 
 A Python port lives in [`python/`](./python) and exposes the same core building blocks: `sign_request`, `verify_request`, `create_signer_client`, and `create_verifier_client`.
+Its built-in HTTP transport uses Python's standard library `urllib.request`, not `httpx` or `requests`; you can override transport with `ClientOptions.fetch`.
 
 Install and run it with `uv`:
 
