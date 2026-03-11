@@ -15,6 +15,34 @@ Sign and verify HTTP requests with Ethereum wallets using [ERC-8128](https://git
 npm install @slicekit/erc8128
 ```
 
+### Python implementation
+
+A Python implementation lives in [`python/`](./python) and exposes the same core building blocks: `sign_request`, `verify_request`, `create_signer_client`, and `create_verifier_client`.
+Its built-in HTTP transport uses `httpx`; you can override transport with `ClientOptions.fetch`.
+
+Install and run it with `uv`:
+
+```bash
+cd python
+uv sync
+uv run python -m unittest discover -s tests -v
+```
+
+```python
+from erc8128 import HttpRequest, SignOptions, create_signer_client
+
+client = create_signer_client(signer)
+signed = client.sign_request(
+    "https://api.example.com/orders",
+    init={
+        "method": "POST",
+        "headers": {"content-type": "application/json"},
+        "body": '{"amount":"100"}',
+    },
+    options=SignOptions(nonce="nonce-1"),
+)
+```
+
 ## Quick Start
 
 ### Sign a request
